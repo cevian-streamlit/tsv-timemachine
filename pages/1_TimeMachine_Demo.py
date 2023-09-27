@@ -38,8 +38,11 @@ def get_repos():
     with psycopg2.connect(dsn=st.secrets["TIMESCALE_SERVICE_URL"]) as connection:
         # Create a cursor within the context manager
         with connection.cursor() as cursor:
-            select_data_sql = "SELECT * FROM time_machine_catalog;"
-            cursor.execute(select_data_sql)
+            try:
+                select_data_sql = "SELECT * FROM time_machine_catalog;"
+                cursor.execute(select_data_sql)
+            except psycopg2.errors.UndefinedTable as e:
+                return {}
 
             catalog_entries = cursor.fetchall()
 
