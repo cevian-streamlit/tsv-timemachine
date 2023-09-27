@@ -6,4 +6,4 @@ streamlit
 llama_index
 timescale_vector
 GitPython
-psycopg2
+psycopg2-binary
