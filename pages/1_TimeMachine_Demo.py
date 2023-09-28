@@ -53,6 +53,47 @@ def get_repos():
 
             return catalog_dict
 
+def get_auto_retriever(index):
+    st.success(f"Type is "+str(type(index.service_context)))
+
+    from llama_index.vector_stores.types import MetadataInfo, VectorStoreInfo
+    vector_store_info = VectorStoreInfo(
+        content_info="Description of the commits",
+        metadata_info=[
+            MetadataInfo(
+                name="commit_hash",
+                type="str",
+                description="Commit Hash",
+            ),
+            MetadataInfo(
+                name="author",
+                type="str",
+                description="Author of the commit",
+            ),
+        ],
+    )
+    from llama_index.indices.vector_store.retrievers import VectorIndexAutoRetriever
+    retriever = VectorIndexAutoRetriever(index, vector_store_info=vector_store_info, service_context=index.service_context, similarity_top_k=20)
+    
+    # build query engine
+    from llama_index.query_engine.retriever_query_engine import RetrieverQueryEngine
+    query_engine = RetrieverQueryEngine.from_args(
+        retriever=retriever, service_context=index.service_context
+    )
+
+    from llama_index.tools.query_engine import QueryEngineTool
+    # convert query engine to tool
+    query_engine_tool = QueryEngineTool.from_defaults(query_engine=query_engine)
+
+    from llama_index.agent import OpenAIAgent
+    chat_engine = OpenAIAgent.from_tools(
+        tools=[query_engine_tool],
+        llm=index.service_context.llm,
+        verbose=True
+        #service_context=index.service_context
+    )
+    return chat_engine
+
 def tm_demo():
     repos = get_repos()
 
@@ -74,10 +115,14 @@ def tm_demo():
     );
 
     index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
+    
+    
     #storage_context = StorageContext.from_defaults(vector_store=vector_store)
     #index = VectorStoreIndex.from_documents(documents, storage_context=storage_context)
-    
-    chat_engine = index.as_chat_engine(chat_mode="condense_question", verbose=True)
+    chat_engine = get_auto_retriever(index)
+    #chat_engine = index.as_chat_engine(chat_mode="best", similarity_top_k=20, verbose=True)
+
+    st.success(f"Type is "+str(type(chat_engine)))
 
     if prompt := st.chat_input("Your question"): # Prompt for user input and save to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
