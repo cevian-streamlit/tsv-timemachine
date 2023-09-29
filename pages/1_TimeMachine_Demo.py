@@ -20,8 +20,10 @@ import streamlit as st
 from streamlit.hello.utils import show_code
 
 from llama_index.vector_stores import TimescaleVectorStore
-from llama_index import StorageContext
+from llama_index import ServiceContext, StorageContext
 from llama_index.indices.vector_store import VectorStoreIndex
+from llama_index.llms import OpenAI
+from llama_index import set_global_service_context
 
 import pandas as pd
 from pathlib import Path
@@ -54,11 +56,9 @@ def get_repos():
             return catalog_dict
 
 def get_auto_retriever(index):
-    st.success(f"Type is "+str(type(index.service_context)))
-
     from llama_index.vector_stores.types import MetadataInfo, VectorStoreInfo
     vector_store_info = VectorStoreInfo(
-        content_info="Description of the commits",
+        content_info="Description of the commits to PostgreSQL. Describes changes made to Postgres",
         metadata_info=[
             MetadataInfo(
                 name="commit_hash",
@@ -114,15 +114,15 @@ def tm_demo():
         time_partition_interval=timedelta(days=7),
     );
 
-    index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
+    service_context = ServiceContext.from_defaults(llm=OpenAI(model="gpt-4", temperature=0.1))
+    set_global_service_context(service_context)
+    index = VectorStoreIndex.from_vector_store(vector_store=vector_store, service_context=service_context)
     
     
     #storage_context = StorageContext.from_defaults(vector_store=vector_store)
     #index = VectorStoreIndex.from_documents(documents, storage_context=storage_context)
     chat_engine = get_auto_retriever(index)
     #chat_engine = index.as_chat_engine(chat_mode="best", similarity_top_k=20, verbose=True)
-
-    st.success(f"Type is "+str(type(chat_engine)))
 
     if prompt := st.chat_input("Your question"): # Prompt for user input and save to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
@@ -135,7 +135,7 @@ def tm_demo():
     if st.session_state.messages[-1]["role"] != "assistant":
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                response = chat_engine.chat(prompt)
+                response = chat_engine.chat(prompt, function_call="query_engine_tool")
                 st.write(response.response)
                 message = {"role": "assistant", "content": response.response}
                 st.session_state.messages.append(message) # Add response to message history
