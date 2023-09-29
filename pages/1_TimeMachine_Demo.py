@@ -100,14 +100,14 @@ def tm_demo():
     #months = st.slider('How many months back to search (0=no limit)?', 0, 130, 0)
 
     if len(repos) > 0:
-        repo = st.selectbox("Choose a repo", repos.keys())
+        repo = st.sidebar.selectbox("Choose a repo", repos.keys())
     else:
         st.error("No repositiories found, please load some data first")
         return
 
     if "messages" not in st.session_state.keys(): # Initialize the chat messages history
         st.session_state.messages = [
-            {"role": "assistant", "content": "Ask me a question about the git history"}
+            {"role": "assistant", "content": "Please choose a repo on the sidebar and then ask me a question about the git history"}
         ]
 
     vector_store = TimescaleVectorStore.from_params(
@@ -146,11 +146,8 @@ def tm_demo():
                 st.session_state.messages.append(message) # Add response to message history
 
 st.set_page_config(page_title="Time machine demo", page_icon="📈")
-st.markdown("# Time Machine Demo")
-st.sidebar.header("Time_machine Demo")
-st.write(
-    """Time Machine Demo!"""
-)
+st.markdown("# Time Machine")
+st.sidebar.header("Welcome to the Time Machine")
 
 tm_demo()
 
