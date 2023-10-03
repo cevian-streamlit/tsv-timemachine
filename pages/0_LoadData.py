@@ -106,12 +106,11 @@ def load_into_db(table_name, df):
     st.spinner("Calculating embeddings...")
     progress = st.progress(0, "Calculating embeddings")
     start = time.time()
-    for node in nodes:
-        node_embedding = embedding_model.get_text_embedding(
-            node.get_content(metadata_mode="all")
-        )
-        node.embedding = node_embedding
-
+    texts = [n.get_content(metadata_mode="all") for n in nodes] 
+    embeddings = embedding_model.get_text_embedding_batch(texts)
+    for i, node in enumerate(nodes):
+        node.embedding = embeddings[i]
+        
     duration = time.time()-start
     progress.progress(100, f"Calculating embeddings took {duration} seconds")
 
