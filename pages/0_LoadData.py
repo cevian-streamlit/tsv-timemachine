@@ -37,34 +37,40 @@ from llama_index.schema import TextNode
 from llama_index.embeddings import OpenAIEmbedding
 from git import Repo
 
+from llama_index.text_splitter import SentenceSplitter
+
 def create_uuid(date_string: str):
     datetime_obj = datetime.fromisoformat(date_string)
     uuid = client.uuid_from_time(datetime_obj)
     return str(uuid)
 
 # Create a Node object from a single row of data
-def create_node(row):
+def create_nodes(row):
+    text_splitter = SentenceSplitter(chunk_size=1024)
+
     record = row.to_dict()
     record_content = (
-        str(record["Date"])
+        "Date: "+ str(record["Date"])
         + " "
-        + record['Author']
+        + "Author: "+ record['Author']
         + " "
         + str(record["Subject"])
         + " "
         + str(record["Body"])
     )
-    # Can change to TextNode as needed
-    node = TextNode(
+
+    text_chunks = text_splitter.split_text(record_content)
+    nodes = [TextNode(
         id_=create_uuid(record["Date"]),
-        text=record_content,
+        text=chunk,
         metadata={
             "commit_hash": record["Commit Hash"],
             "author": record['Author'],
             "date": record["Date"],
         },
-    )
-    return node
+    ) for chunk in text_chunks]
+
+    return nodes
 
 def github_url_to_table_name(github_url):
     repository_path = github_url.replace("https://github.com/", "")
@@ -98,7 +104,7 @@ def record_catalog_info(repo):
 
 
 def load_into_db(table_name, df):
-    nodes = [create_node(row) for _, row in df.iterrows()]
+    nodes = [item for sublist in [create_nodes(row) for _, row in df.iterrows()] for item in sublist]
 
     embedding_model = OpenAIEmbedding()
     embedding_model.api_key = st.secrets["OPENAI_API_KEY"]
@@ -110,7 +116,7 @@ def load_into_db(table_name, df):
     embeddings = embedding_model.get_text_embedding_batch(texts)
     for i, node in enumerate(nodes):
         node.embedding = embeddings[i]
-        
+
     duration = time.time()-start
     progress.progress(100, f"Calculating embeddings took {duration} seconds")
 
