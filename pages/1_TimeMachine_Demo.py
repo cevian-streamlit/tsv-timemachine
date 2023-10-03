@@ -55,7 +55,7 @@ def get_repos():
 
             return catalog_dict
 
-def get_auto_retriever(index):
+def get_auto_retriever(index, retriever_args):
     from llama_index.vector_stores.types import MetadataInfo, VectorStoreInfo
     vector_store_info = VectorStoreInfo(
         content_info="Description of the commits to PostgreSQL. Describes changes made to Postgres",
@@ -73,7 +73,11 @@ def get_auto_retriever(index):
         ],
     )
     from llama_index.indices.vector_store.retrievers import VectorIndexAutoRetriever
-    retriever = VectorIndexAutoRetriever(index, vector_store_info=vector_store_info, service_context=index.service_context, similarity_top_k=20)
+    retriever = VectorIndexAutoRetriever(index, 
+                                         vector_store_info=vector_store_info, 
+                                         service_context=index.service_context,
+                                         similarity_top_k=20,
+                                         **retriever_args)
     
     # build query engine
     from llama_index.query_engine.retriever_query_engine import RetrieverQueryEngine
@@ -97,17 +101,31 @@ def get_auto_retriever(index):
 def tm_demo():
     repos = get_repos()
 
-    #months = st.slider('How many months back to search (0=no limit)?', 0, 130, 0)
+    retriever_args = {}
+    months = st.sidebar.slider('How many months back to search (0=no limit)?', 0, 130, 0)
+
+    if "config_months" not in st.session_state.keys() or months != st.session_state.config_months:
+        st.session_state.clear()
+        st.session_state.config_months = months
+        if months > 0:
+            end_dt = datetime.now()
+            start_dt = end_dt - timedelta(weeks=4*months)
+            retriever_args["vector_store_kwargs"] = ({"start_date": start_dt, "end_date":end_dt})
 
     if len(repos) > 0:
         repo = st.sidebar.selectbox("Choose a repo", repos.keys())
     else:
-        st.error("No repositiories found, please load some data first")
+        st.error("No repositiories found, please [load some data first](/LoadData)")
         return
+    
+    if "config_repo" not in st.session_state.keys() or repo != st.session_state.config_repo:
+        st.session_state.clear()
+        st.session_state.config_repo = repo
+
 
     if "messages" not in st.session_state.keys(): # Initialize the chat messages history
         st.session_state.messages = [
-            {"role": "assistant", "content": "Please choose a repo on the sidebar and then ask me a question about the git history"}
+            {"role": "assistant", "content": "Please choose a repo and time filter on the sidebar and then ask me a question about the git history"}
         ]
 
     vector_store = TimescaleVectorStore.from_params(
@@ -125,8 +143,8 @@ def tm_demo():
     #index = VectorStoreIndex.from_documents(documents, storage_context=storage_context)
     
     #chat engine goes into the session to retain history
-    if "chat_engine" not in st.session_state.keys(): # Initialize the chat messages history
-        st.session_state.chat_engine = get_auto_retriever(index)
+    if "chat_engine" not in st.session_state.keys(): # Initialize the chat engine
+        st.session_state.chat_engine = get_auto_retriever(index, retriever_args)
         #st.session_state.chat_engine = index.as_chat_engine(chat_mode="best", similarity_top_k=20, verbose=True)
 
     if prompt := st.chat_input("Your question"): # Prompt for user input and save to chat history

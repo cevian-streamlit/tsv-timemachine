@@ -3,7 +3,7 @@ numpy
 pandas
 pydeck
 streamlit
-llama_index
+llama_index >= 0.8.37
 timescale_vector
 GitPython
 psycopg2-binary
