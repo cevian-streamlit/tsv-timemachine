@@ -246,7 +246,7 @@ def load_git_history():
         table_name = record_catalog_info(repo)
         load_into_db(table_name, df)
 
-st.set_page_config(page_title="Load git history", page_icon="📈")
+st.set_page_config(page_title="Load git history", page_icon="💿")
 st.markdown("# Load git history for analysis")
 st.sidebar.header("Load git history")
 st.write(

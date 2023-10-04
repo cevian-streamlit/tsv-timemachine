@@ -163,7 +163,7 @@ def tm_demo():
                 message = {"role": "assistant", "content": response.response}
                 st.session_state.messages.append(message) # Add response to message history
 
-st.set_page_config(page_title="Time machine demo", page_icon="📈")
+st.set_page_config(page_title="Time machine demo", page_icon="🧑‍💼")
 st.markdown("# Time Machine")
 st.sidebar.header("Welcome to the Time Machine")
 
