@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import cpu_count
 import time
 import subprocess
 import shutil
@@ -103,22 +105,9 @@ def record_catalog_info(repo):
             return table_name
 
 
-def load_into_db(table_name, df):
-    nodes = [item for sublist in [create_nodes(row) for _, row in df.iterrows()] for item in sublist]
-
+def load_into_db(table_name, df_combined):
     embedding_model = OpenAIEmbedding()
     embedding_model.api_key = st.secrets["OPENAI_API_KEY"]
-
-    st.spinner("Calculating embeddings...")
-    progress = st.progress(0, "Calculating embeddings")
-    start = time.time()
-    texts = [n.get_content(metadata_mode="all") for n in nodes] 
-    embeddings = embedding_model.get_text_embedding_batch(texts)
-    for i, node in enumerate(nodes):
-        node.embedding = embeddings[i]
-
-    duration = time.time()-start
-    progress.progress(100, f"Calculating embeddings took {duration} seconds")
 
     ts_vector_store = TimescaleVectorStore.from_params(
         service_url=st.secrets["TIMESCALE_SERVICE_URL"],
@@ -129,14 +118,44 @@ def load_into_db(table_name, df):
     ts_vector_store._sync_client.drop_table()
     ts_vector_store._sync_client.create_tables()
 
-    st.spinner("Writing to the db...")
-    progress = st.progress(0, "Writing to the db")
+    cpus = cpu_count()
+    min_splits = len(df_combined.index) / 1000 #no more than 1000 rows/split
+    num_splits = int(max(cpus, min_splits))
+
+
+    st.spinner("Processing...")
+    progress = st.progress(0, f"Processing, with {num_splits} splits")
     start = time.time()
-    _ = ts_vector_store.add(nodes)
 
-    duration = time.time()-start
-    progress.progress(100, f"Writing to the db took {duration} seconds")
+    nodes_combined = [item for sublist in [create_nodes(row) for _, row in df_combined.iterrows()] for item in sublist]
+    node_tasks = np.array_split(nodes_combined, num_splits)
+    
+    def worker(nodes): 
+        start = time.time()
+        texts = [n.get_content(metadata_mode="all") for n in nodes] 
+        embeddings = embedding_model.get_text_embedding_batch(texts)
+        for i, node in enumerate(nodes):
+            node.embedding = embeddings[i]
+        duration_embedding = time.time()-start
+        start = time.time()
+        ts_vector_store.add(nodes)
+        duration_db = time.time()-start
+        return (duration_embedding, duration_db)
 
+    embedding_durations = []
+    db_durations = []
+    with ThreadPoolExecutor() as executor:
+        times = executor.map(worker, node_tasks)
+
+        for index, worker_times in enumerate(times):
+            duration_embedding, duration_db = worker_times
+            embedding_durations.append(duration_embedding)
+            db_durations.append(duration_db)
+            progress.progress((index+1)/num_splits, f"Processing, with {num_splits} splits")
+
+
+    progress.progress(100, f"Processing embeddings took {sum(embedding_durations)}s. Db took {sum(db_durations)}s. Using {num_splits} splits")
+    
     st.spinner("Creating the index...")
     progress = st.progress(0, "Creating the index")
     start = time.time()
