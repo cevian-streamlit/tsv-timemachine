@@ -252,7 +252,8 @@ st.sidebar.header("Load git history")
 st.write(
     """Load Git history!"""
 )
-
-load_git_history()
-
+if  st.secrets.get("ENABLE_LOAD") == 1:
+    load_git_history()
+else:
+    st.warning("Loading is disabled on the demo site. Please follow the instructions in the [README](https://github.com/cevian-streamlit/tsv-timemachine/tree/main) to enable loading.")
 #show_code(tm_demo)
