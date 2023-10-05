@@ -76,7 +76,6 @@ def get_auto_retriever(index, retriever_args):
     retriever = VectorIndexAutoRetriever(index, 
                                          vector_store_info=vector_store_info, 
                                          service_context=index.service_context,
-                                         similarity_top_k=20,
                                          **retriever_args)
     
     # build query engine
@@ -101,17 +100,15 @@ def get_auto_retriever(index, retriever_args):
 def tm_demo():
     repos = get_repos()
 
-    retriever_args = {}
     months = st.sidebar.slider('How many months back to search (0=no limit)?', 0, 130, 0)
 
     if "config_months" not in st.session_state.keys() or months != st.session_state.config_months:
         st.session_state.clear()
-        st.session_state.config_months = months
-        if months > 0:
-            end_dt = datetime.now()
-            start_dt = end_dt - timedelta(weeks=4*months)
-            retriever_args["vector_store_kwargs"] = ({"start_date": start_dt, "end_date":end_dt})
 
+    topk = st.sidebar.slider('How many commits to retrieve', 1, 150, 20)
+    if "config_topk" not in st.session_state.keys() or topk != st.session_state.config_topk:
+        st.session_state.clear()
+        
     if len(repos) > 0:
         repo = st.sidebar.selectbox("Choose a repo", repos.keys())
     else:
@@ -120,7 +117,10 @@ def tm_demo():
     
     if "config_repo" not in st.session_state.keys() or repo != st.session_state.config_repo:
         st.session_state.clear()
-        st.session_state.config_repo = repo
+    
+    st.session_state.config_months = months
+    st.session_state.config_topk = topk
+    st.session_state.config_repo = repo
 
 
     if "messages" not in st.session_state.keys(): # Initialize the chat messages history
@@ -138,12 +138,14 @@ def tm_demo():
     set_global_service_context(service_context)
     index = VectorStoreIndex.from_vector_store(vector_store=vector_store, service_context=service_context)
     
-    
-    #storage_context = StorageContext.from_defaults(vector_store=vector_store)
-    #index = VectorStoreIndex.from_documents(documents, storage_context=storage_context)
-    
+        
     #chat engine goes into the session to retain history
     if "chat_engine" not in st.session_state.keys(): # Initialize the chat engine
+        retriever_args = {"similarity_top_k" : int(topk)}
+        if months > 0:
+            end_dt = datetime.now()
+            start_dt = end_dt - timedelta(weeks=4*months)
+            retriever_args["vector_store_kwargs"] = ({"start_date": start_dt, "end_date":end_dt})
         st.session_state.chat_engine = get_auto_retriever(index, retriever_args)
         #st.session_state.chat_engine = index.as_chat_engine(chat_mode="best", similarity_top_k=20, verbose=True)
 

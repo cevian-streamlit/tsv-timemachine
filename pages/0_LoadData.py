@@ -112,7 +112,7 @@ def load_into_db(table_name, df_combined):
     ts_vector_store = TimescaleVectorStore.from_params(
         service_url=st.secrets["TIMESCALE_SERVICE_URL"],
         table_name=table_name,
-        time_partition_interval=timedelta(days=7),
+        time_partition_interval=timedelta(days=365),
     )
 
     ts_vector_store._sync_client.drop_table()
