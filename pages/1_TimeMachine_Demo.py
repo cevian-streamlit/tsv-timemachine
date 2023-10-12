@@ -70,6 +70,18 @@ def get_auto_retriever(index, retriever_args):
                 type="str",
                 description="Author of the commit",
             ),
+            MetadataInfo(
+                name="__start_date",
+                type="datetime in iso format",
+                description="All results will be after this datetime",
+    
+            ),
+            MetadataInfo(
+                name="__end_date",
+                type="datetime in iso format",
+                description="All results will be before this datetime",
+    
+            )
         ],
     )
     from llama_index.indices.vector_store.retrievers import VectorIndexAutoRetriever
@@ -168,6 +180,14 @@ def tm_demo():
 st.set_page_config(page_title="Time machine demo", page_icon="🧑‍💼")
 st.markdown("# Time Machine")
 st.sidebar.header("Welcome to the Time Machine")
+
+debug_llamaindex = False
+if debug_llamaindex:
+    import logging
+    import sys
+
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+    logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
 
 tm_demo()
 
